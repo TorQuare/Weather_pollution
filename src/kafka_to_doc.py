@@ -15,7 +15,6 @@ class Subscriber:
         )
 
     def collect_data(self):
-        print('works')
         for message in self.consumer:
             data = message.value
             timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')

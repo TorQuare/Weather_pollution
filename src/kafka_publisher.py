@@ -19,7 +19,7 @@ class Publisher:
             if air_quality_data:
                 print(f'Publishing: {air_quality_data}')
                 self.producer.send(Enum.KAFKA_TOPIC, air_quality_data)
-            time.sleep(36)
+            time.sleep(3600)
 
     @staticmethod
     def _fetch_air_quality():

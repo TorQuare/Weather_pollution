@@ -8,28 +8,40 @@ class FaissQueryT5:
 
     metadata = None
     neighbours = 3
-    question = "What is the trend of air pollution changes?"
-    prompt = "Analyze the following air quality data and describe the trend of air pollution changes: "
+    default_question = "What are the trends in PM2.5 levels?"
+    default_context = "Analyze the following air quality data: \n"
+    default_prompt = "Analyze the air quality data below and summarize the trends in PM2.5, PM10, and SO2 levels over time: \n"
 
     def __init__(self):
         self.index = faiss.read_index(Enum.INDEX_FILE)
         self.t5_tokenizer = T5Tokenizer.from_pretrained("t5-small", legacy=True)
         self.t5_model = T5ForConditionalGeneration.from_pretrained("t5-small")
 
-    def ask_t5_via_question(self, question):
+    def ask_t5_via_question(self, question, context):
         self.metadata = self._load_metadata()
-        input_text = f"Question: {question} Context: {self.metadata[:self.neighbours]}"
-        self._ask_t5(input_text)
+
+        input_text = (f"Question: {question}\n"
+                      + f"Context: {context}"
+                      + "\n".join(self.metadata[:self.neighbours])
+                      )
+
+        return input_text, self._ask_t5(input_text)
 
     def ask_t5_via_prompt(self, prompt):
         self.metadata = self._load_metadata()
+
         input_text = prompt + ''.join(self.metadata[:self.neighbours])
-        self._ask_t5(input_text)
+
+        return input_text, self._ask_t5(input_text)
 
     def _ask_t5(self, input_text):
+        self._show_best_data()
+
         input_ids = self.t5_tokenizer.encode(input_text, return_tensors="pt")
         outputs = self.t5_model.generate(input_ids)
+
         print("Generated Answer:", self.t5_tokenizer.decode(outputs[0], skip_special_tokens=True))
+        return '\nGenerated answer: ' + str(self.t5_tokenizer.decode(outputs[0], skip_special_tokens=True))
 
     def _found_neighbours(self):
         self.distances, self.indices = self.index.search(
@@ -38,7 +50,10 @@ class FaissQueryT5:
         )
 
     def _show_best_data(self):
+        self._found_neighbours()
+
         print("Top documents:")
+
         for i, idx in enumerate(self.indices[0]):
             print(f"Rank {i+1}: {self.metadata[idx]} (Distance: {self.distances[0][i]})")
 
@@ -47,6 +62,7 @@ class FaissQueryT5:
         metadata = []
         with open(Enum.METADATA_FILE, 'r') as file:
             filenames = json.load(file)
+
         for filedata in filenames:
             filename = filedata['filename']
             date = filedata['date']
