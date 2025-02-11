@@ -1,6 +1,7 @@
 import faiss
 import numpy as np
 import json
+
 from src.data_enum import Enum
 from transformers import T5Tokenizer, T5ForConditionalGeneration
 
@@ -8,22 +9,20 @@ class FaissQueryT5:
 
     metadata = None
     neighbours = 3
+    default_following_data = '\n Use following data: '
     default_question = "What are the trends in PM2.5 levels?"
-    default_context = "Analyze the following air quality data: \n"
-    default_prompt = "Analyze the air quality data below and summarize the trends in PM2.5, PM10, and SO2 levels over time: \n"
+    default_context = "Analyze the following air quality data:"
+    default_prompt = "Analyze the air quality data below and summarize the trends in PM2.5, PM10, and SO2 levels over time:"
 
     def __init__(self):
         self.index = faiss.read_index(Enum.INDEX_FILE)
         self.t5_tokenizer = T5Tokenizer.from_pretrained("t5-small", legacy=True)
         self.t5_model = T5ForConditionalGeneration.from_pretrained("t5-small")
 
-    def ask_t5_via_question(self, question, context):
+    def ask_t5_via_question(self, asked_question, context):
         self.metadata = self._load_metadata()
 
-        input_text = (f"Question: {question}\n"
-                      + f"Context: {context}"
-                      + "\n".join(self.metadata[:self.neighbours])
-                      )
+        input_text = (asked_question + context + " ".join(self.metadata[:self.neighbours]))
 
         return input_text, self._ask_t5(input_text)
 
@@ -41,7 +40,7 @@ class FaissQueryT5:
         outputs = self.t5_model.generate(input_ids)
 
         print("Generated Answer:", self.t5_tokenizer.decode(outputs[0], skip_special_tokens=True))
-        return '\nGenerated answer: ' + str(self.t5_tokenizer.decode(outputs[0], skip_special_tokens=True))
+        return str(self.t5_tokenizer.decode(outputs[0], skip_special_tokens=True))
 
     def _found_neighbours(self):
         self.distances, self.indices = self.index.search(
@@ -76,6 +75,6 @@ class FaissQueryT5:
                 pm10 = components_section['pm10']
                 so2 = components_section['so2']
                 metadata.append(
-                    f'Date: {date}, Time: {time}, PM2.5: {pm25}, PM10: {pm10}, SO2: {so2}'
+                    f' Date: {date}, Time: {time}, PM2.5: {pm25}, PM10: {pm10}, SO2: {so2}'
                 )
         return metadata
